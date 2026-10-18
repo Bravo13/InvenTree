@@ -182,16 +182,34 @@ interface PartOrderRecord {
   errors: any;
 }
 
+/**
+ * Convert a part quantity into a number of supplier packs (rounded up to whole packs)
+ */
+function packQuantity(quantity: number, supplierPart: any): number {
+  const pack = supplierPart?.pack_quantity_native;
+
+  if (!pack || pack <= 0) {
+    return quantity;
+  }
+
+  // Round off float noise first (e.g. 3 / 0.1 = 30.000000000000004)
+  const packs = Math.round((quantity / pack) * 1e6) / 1e6;
+
+  return Math.max(0, Math.ceil(packs));
+}
+
 function SelectPartsStep({
   records,
   onRemovePart,
   onSelectQuantity,
+  onSelectRequiredQuantity,
   onSelectSupplierPart,
   onSelectPurchaseOrder
 }: {
   records: PartOrderRecord[];
   onRemovePart: (part: any) => void;
   onSelectQuantity: (partId: number, quantity: number) => void;
+  onSelectRequiredQuantity: (partId: number, quantity: number) => void;
   onSelectSupplierPart: (partId: number, supplierPart: any) => void;
   onSelectPurchaseOrder: (partId: number, purchaseOrder: any) => void;
 }) {
@@ -416,7 +434,7 @@ function SelectPartsStep({
             <PartRequirementsInfo
               partId={record.part.pk}
               onQuantityChange={(quantity: number) =>
-                onSelectQuantity(record.part.pk, quantity)
+                onSelectRequiredQuantity(record.part.pk, quantity)
               }
             />
           </Group>
@@ -522,6 +540,27 @@ export default function OrderPartsWizard({
     [selectedParts]
   );
 
+  // Set the required quantity (in part units) for a part
+  // The supplier part may already be selected (auto-filled), so convert to packs here too
+  const selectRequiredQuantity = useCallback(
+    (partId: number, quantity: number) => {
+      const records = [...selectedParts];
+
+      records.forEach((record: PartOrderRecord, index: number) => {
+        if (record.part.pk === partId) {
+          records[index].quantity_raw = quantity;
+          records[index].quantity = packQuantity(
+            quantity,
+            record.supplier_part
+          );
+        }
+      });
+
+      setSelectedParts(records);
+    },
+    [selectedParts]
+  );
+
   // Select a supplier part for a part
   const selectSupplierPart = useCallback(
     (partId: number, supplierPart: any) => {
@@ -540,9 +579,9 @@ export default function OrderPartsWizard({
             records[index].quantity_raw
           ) {
             // Adjust the quantity based on the supplier pack size
-            records[index].quantity = Math.max(
-              0,
-              records[index].quantity_raw / supplierPart.pack_quantity_native
+            records[index].quantity = packQuantity(
+              records[index].quantity_raw ?? 0,
+              supplierPart
             );
           }
         }
@@ -577,6 +616,7 @@ export default function OrderPartsWizard({
           records={selectedParts}
           onRemovePart={removePart}
           onSelectQuantity={selectQuantity}
+          onSelectRequiredQuantity={selectRequiredQuantity}
           onSelectSupplierPart={selectSupplierPart}
           onSelectPurchaseOrder={selectPurchaseOrder}
         />
@@ -586,6 +626,7 @@ export default function OrderPartsWizard({
       selectedParts,
       removePart,
       selectQuantity,
+      selectRequiredQuantity,
       selectSupplierPart,
       selectPurchaseOrder
     ]
