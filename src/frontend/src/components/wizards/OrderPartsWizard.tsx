@@ -5,11 +5,13 @@ import { ApiEndpoints } from '@lib/enums/ApiEndpoints';
 import { ModelType } from '@lib/enums/ModelType';
 import { apiUrl } from '@lib/functions/Api';
 import { formatDecimal } from '@lib/functions/Formatting';
+import { getDetailUrl } from '@lib/functions/Navigation';
 import type { ApiFormFieldSet } from '@lib/types/Forms';
 import { t } from '@lingui/core/macro';
 import {
   ActionIcon,
   Alert,
+  Anchor,
   Divider,
   Group,
   HoverCard,
@@ -287,7 +289,15 @@ function SelectPartsStep({
         render: (record: PartOrderRecord) => (
           <Tooltip label={record.part?.description}>
             <Paper p='xs'>
-              <RenderPartColumn part={record.part} />
+              {/* Open in a new tab, so the wizard state is kept */}
+              <Anchor
+                href={getDetailUrl(ModelType.part, record.part?.pk, true)}
+                target='_blank'
+                rel='noopener noreferrer'
+                underline='hover'
+              >
+                <RenderPartColumn part={record.part} />
+              </Anchor>
             </Paper>
           </Tooltip>
         )
